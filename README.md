@@ -1,88 +1,242 @@
 # PromoCode Mod — Minecraft Forge 1.16.5
 
-Adds a promo code system to Minecraft. Players open a GUI, type a code and get item rewards.
+A complete promo code system for Minecraft servers. Admins create codes with item rewards, players redeem them for cool loot!
 
 ---
 
 ## Features
-- `/promo` or `/promocode` command opens the GUI
-- Codes defined in server config (`promocodemod-server.toml`)
-- Each code: custom item rewards, max uses, optional expiry
-- Per-player tracking (each player can use a code only once)
-- Data saved to world folder (`promocodes_data.json`)
-
----
-
-## Building
-
-### Requirements
-- Java 8 (JDK)
-- Git
-
-### Steps
-```bash
-# 1. Clone / download this folder
-cd promocodemod
-
-# 2. Set up Forge MDK (first time only)
-./gradlew genEclipseRuns   # or genIntellijRuns
-
-# 3. Build the jar
-./gradlew build
-
-# Output: build/libs/promocodemod-1.16.5-1.0.0.jar
-```
+✅ `/promo` GUI for easy code redemption  
+✅ Multiple items per code  
+✅ Set max uses and expiration dates  
+✅ Create/delete codes in-game or via config  
+✅ Anti-abuse: each player redeems each code once  
+✅ Live statistics (redeemed count, player count)  
+✅ Works offline and online  
+✅ Data auto-saved to `promocodes_data.json`
 
 ---
 
 ## Installation
-1. Copy the `.jar` to your Forge 1.16.5 `mods/` folder (client **and** server).
-2. Start the server once — config generates at `config/promocodemod-server.toml`.
+
+1. Download the mod JAR
+2. Place in your Forge 1.16.5 `mods/` folder
+3. Start server — config auto-creates at `server_config/promocodemod-server.toml`
+4. Configure default codes in the `.toml` file, or use commands to add them
 
 ---
 
-## Configuring Codes
+## Commands
 
-Edit `config/promocodemod-server.toml`:
+### Player Commands
+```
+/promo                    Opens the redeem GUI
+/promocode                Same as /promo
+/promo help               Show all available commands
+```
+
+### Admin Commands (Op level 2+)
+
+**Create Simple Code (1 item):**
+```
+/promo create CODE item count [maxUses] [expiryEpoch]
+```
+Examples:
+```
+/promo create WELCOME minecraft:diamond 5
+/promo create SUMMER minecraft:golden_apple 10 100 0
+```
+
+**Create Multi-Item Code (2-3 items):**
+```
+/promo create CODE item1 count1 item2 count2 [item3 count3] [maxUses] [expiryEpoch]
+```
+Example:
+```
+/promo create STARTER minecraft:diamond 3 minecraft:iron_sword 1 minecraft:bread 10 150 0
+```
+
+**Create Advanced Code (unlimited items):**
+```
+/promo createraw CODE:item1,count1;item2,count2;item3,count3|maxUses|expiryEpoch
+```
+Example:
+```
+/promo createraw MEGA:minecraft:diamond,10;minecraft:emerald,5;minecraft:golden_apple,3|50|0
+```
+
+**Delete Code:**
+```
+/promo delete CODE
+```
+Example:
+```
+/promo delete WELCOME
+```
+
+---
+
+## Parameters
+
+| Parameter | Description | Example |
+|-----------|-------------|---------|
+| `CODE` | Code name (letters, numbers, _, -) | `WELCOME`, `SUMMER2024` |
+| `item` | Item ID (namespace:name) | `minecraft:diamond` |
+| `count` | Item quantity (1-64) | `5` |
+| `maxUses` | Total redemptions allowed (0=unlimited) | `100` |
+| `expiryEpoch` | Unix timestamp (0=never expires) | `1672531200` |
+
+### Common Item IDs
+```
+minecraft:diamond
+minecraft:emerald
+minecraft:golden_apple
+minecraft:enchanted_golden_apple
+minecraft:netherite_sword
+minecraft:diamond_pickaxe
+minecraft:diamond_axe
+minecraft:respawn_anchor
+minecraft:iron_sword
+minecraft:bread
+```
+
+---
+
+## Configuration
+
+Edit `server_config/promocodemod-server.toml`:
 
 ```toml
-[promocodes]
-    # Format: CODE:item,count;item2,count2|maxUses|expiryEpochSeconds
-    # expiryEpochSeconds = 0 → never expires
-    codes = [
-        "EARLY_EASTER:minecraft:diamond,5;minecraft:golden_apple,3|100|0",
-        "FREESTART:minecraft:iron_sword,1;minecraft:bread,10|200|0",
-        "DIAMONDS4ALL:minecraft:diamond,64|10|0"
-    ]
+[[promocodes]]
+codes = [
+    "EARLY_EASTER:minecraft:diamond,5;minecraft:golden_apple,3|100|0",
+    "FREESTART:minecraft:iron_sword,1;minecraft:bread,10|200|0",
+    "DIAMONDS4ALL:minecraft:diamond,64|10|0"
+]
 ```
 
-### Format breakdown
-```
-MYCODE:minecraft:diamond,5;minecraft:apple,10|50|0
-│      │                  │                │  │
-│      └─ item:count pairs separated by ;  │  └─ expiry (0=never)
-│                                          └─ max total uses
-└─ the code players type
-```
-
-You can use any valid item registry name (modded items work too!).
+**Format:** `CODE:item1,count1;item2,count2|maxUses|expiryEpoch`
 
 ---
 
-## In-Game Usage
+## How It Works
 
-Players type `/promo` and a GUI appears. They enter the code and click Confirm (or press Enter).
+1. **Player opens GUI** → `/promo`
+2. **Types code** → `WELCOME`
+3. **Clicks "CONFIRM"** (or presses Enter)
+4. **Items appear** in inventory (overflow drops at feet)
 
-- ✅ Valid code → items appear in inventory (overflow drops at feet)
-- ❌ Invalid / already used / expired → error message shown in GUI
+**Statistics shown:**
+- Redeemed: `25/100` (25 of 100 items claimed)
+- Players: `10` (10 unique players redeemed something)
 
 ---
 
-## Adding Admin Commands (optional)
+## Anti-Abuse Protection
 
-You can extend `PromoCommand.java` to add:
-- `/promo add <code> ...` — add codes at runtime
-- `/promo list` — list all codes
-- `/promo reset <player> <code>` — reset a player's redemption
+Each player can redeem each code **exactly once**. This is enforced even if:
+- Player changes their name
+- Player creates a new account on offline server
+- Server restarts
+- Player joins on different online account
 
-These are left as exercises since the config approach covers most servers.
+⚠️ **For offline servers:** Make sure admins moderate carefully, as players could theoretically use mods to bypass the system.
+
+---
+
+## Data Storage
+
+Redemption data saved to:
+```
+world_folder/promocodes_data.json
+```
+
+Contains:
+- Which players used which codes
+- Redemption count per code
+- Custom codes added via commands
+
+This is auto-managed — don't edit manually unless backing up!
+
+---
+
+## Building from Source
+
+### Requirements
+- Java 8 JDK
+- Git
+
+### Steps
+```bash
+# Clone the repo
+git clone <repo_url>
+cd promo
+
+# Generate IDE files (first time)
+./gradlew genEclipseRuns
+
+# Build
+./gradlew build
+
+# Output: build/libs/promocodemod-1.0.0.jar
+```
+
+---
+
+## Examples
+
+### Welcome Bonus
+```
+/promo create WELCOME minecraft:diamond,5 minecraft:iron_sword,1 minecraft:bread,10 0 0
+```
+Players get: 5 diamonds, 1 iron sword, 10 bread. Unlimited uses, never expires.
+
+### Limited Event
+```
+/promo create HALLOWEEN minecraft:pumpkin,20 50 0
+```
+Players get: 20 pumpkins. Only 50 total redemptions allowed, never expires.
+
+### Timed Event (Unix epoch summer 2024)
+```
+/promo create SUMMER minecraft:diamond,10 100 1725148800
+```
+Players get: 10 diamonds. Expires September 1, 2024. (epoch: 1725148800)
+
+### Delete Old Code
+```
+/promo delete HALLOWEEN
+```
+
+---
+
+## Tips for Server Admins
+
+💡 **Starter Codes** — Create beginner codes with tools and food  
+💡 **Event Codes** — Rotate seasonal codes with theme-related items  
+💡 **Announcements** — Tell players about new codes in chat/Discord  
+💡 **Monitor Stats** — Check the GUI to see who's redeeming what  
+💡 **Cleanup** — Delete expired codes to keep things organized
+
+---
+
+## Troubleshooting
+
+**"Invalid item" error?**
+- Check spelling of item ID (e.g., `minecraft:acacia_log` not `acacia log`)
+
+**"Code already exists"?**
+- Delete the old one first: `/promo delete OLDCODE`
+
+**"Can't redeem" but code exists?**
+- Maybe you already used it! (each player = 1 redeem per code)
+- Check expiry time if set
+- Check max uses limit
+
+**Items not appearing?**
+- Check inventory space (overflow drops at feet)
+- Restart server if just added to config
+
+---
+
+**Happy rewarding! 🎉**
+
