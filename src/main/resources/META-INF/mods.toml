@@ -1,0 +1,28 @@
+modLoader="javafml"
+loaderVersion="[36,)"
+license="MIT"
+
+[[dependencies.promocodemod]]
+    modId="forge"
+    mandatory=true
+    versionRange="[36.1,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.promocodemod]]
+    modId="minecraft"
+    mandatory=true
+    versionRange="[1.16.5,1.17)"
+    ordering="NONE"
+    side="BOTH"
+
+[[mods]]
+    modId="promocodemod"
+    version="1.0.0"
+    displayName="PromoCode Mod"
+    description='''
+        Adds a promo code system to Minecraft.
+        Players type /promo or /promocode to open the GUI.
+        Codes are defined in the server config and give item rewards.
+    '''
+    logoFile="promocodemod.png"

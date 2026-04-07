@@ -1,0 +1,124 @@
+package com.promocodemod.common.network;
+
+import com.promocodemod.PromoCodeMod;
+import com.promocodemod.common.config.PromoCodeManager;
+import net.minecraft.entity.player.ServerPlayerEntity;
+import net.minecraft.item.ItemStack;
+import net.minecraft.network.PacketBuffer;
+import net.minecraft.util.text.*;
+import net.minecraftforge.fml.network.NetworkEvent;
+import net.minecraftforge.fml.network.NetworkRegistry;
+import net.minecraftforge.fml.network.simple.SimpleChannel;
+
+import java.util.function.Supplier;
+
+public class NetworkHandler {
+
+    private static final String PROTOCOL = "1";
+    public static SimpleChannel CHANNEL;
+
+    public static void register() {
+        CHANNEL = NetworkRegistry.newSimpleChannel(
+            new net.minecraft.util.ResourceLocation(PromoCodeMod.MOD_ID, "main"),
+            () -> PROTOCOL,
+            PROTOCOL::equals,
+            PROTOCOL::equals
+        );
+
+        CHANNEL.registerMessage(0, RedeemCodePacket.class,
+            RedeemCodePacket::encode,
+            RedeemCodePacket::decode,
+            RedeemCodePacket::handle);
+
+        CHANNEL.registerMessage(1, RedeemResultPacket.class,
+            RedeemResultPacket::encode,
+            RedeemResultPacket::decode,
+            RedeemResultPacket::handle);
+    }
+
+    // ─── Client → Server: player sends a code ───────────────────────────────
+    public static class RedeemCodePacket {
+        public final String code;
+
+        public RedeemCodePacket(String code) { this.code = code; }
+
+        public static void encode(RedeemCodePacket pkt, PacketBuffer buf) {
+            buf.writeUtf(pkt.code, 64);
+        }
+
+        public static RedeemCodePacket decode(PacketBuffer buf) {
+            return new RedeemCodePacket(buf.readUtf(64));
+        }
+
+        public static void handle(RedeemCodePacket pkt, Supplier<NetworkEvent.Context> ctx) {
+            ctx.get().enqueueWork(() -> {
+                ServerPlayerEntity player = ctx.get().getSender();
+                if (player == null) return;
+
+                PromoCodeManager.RedeemOutcome outcome =
+                    PromoCodeManager.get().redeem(player.getUUID(), pkt.code);
+
+                String msg;
+                boolean success = false;
+
+                switch (outcome.result) {
+                    case SUCCESS:
+                        msg = "§aCode redeemed! Enjoy your rewards!";
+                        success = true;
+                        for (ItemStack stack : outcome.rewards) {
+                            if (!player.inventory.add(stack)) {
+                                player.drop(stack, false);
+                            }
+                        }
+                        break;
+                    case ALREADY_USED:
+                        msg = "§cYou have already used this code!";
+                        break;
+                    case MAX_USES_REACHED:
+                        msg = "§cThis code has reached its maximum uses!";
+                        break;
+                    case EXPIRED:
+                        msg = "§cThis promo code has expired!";
+                        break;
+                    default:
+                        msg = "§cInvalid promo code. Please try again.";
+                        break;
+                }
+
+                // Send result back to client
+                CHANNEL.sendTo(new RedeemResultPacket(success, msg),
+                    player.connection.connection,
+                    net.minecraftforge.fml.network.NetworkDirection.PLAY_TO_CLIENT);
+            });
+            ctx.get().setPacketHandled(true);
+        }
+    }
+
+    // ─── Server → Client: result message ────────────────────────────────────
+    public static class RedeemResultPacket {
+        public final boolean success;
+        public final String message;
+
+        public RedeemResultPacket(boolean success, String message) {
+            this.success = success;
+            this.message = message;
+        }
+
+        public static void encode(RedeemResultPacket pkt, PacketBuffer buf) {
+            buf.writeBoolean(pkt.success);
+            buf.writeUtf(pkt.message, 256);
+        }
+
+        public static RedeemResultPacket decode(PacketBuffer buf) {
+            return new RedeemResultPacket(buf.readBoolean(), buf.readUtf(256));
+        }
+
+        public static void handle(RedeemResultPacket pkt, Supplier<NetworkEvent.Context> ctx) {
+            ctx.get().enqueueWork(() -> {
+                // Handled by the GUI screen on the client side
+                com.promocodemod.client.gui.PromoCodeScreen.handleResult(pkt.success, pkt.message);
+            });
+            ctx.get().setPacketHandled(true);
+        }
+    }
+}
