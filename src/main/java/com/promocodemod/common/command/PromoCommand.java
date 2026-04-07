@@ -35,6 +35,11 @@ public class PromoCommand {
                 .requires(source -> source.hasPermission(2))
                 .then(Commands.argument("code", StringArgumentType.word())
                     .executes(ctx -> deleteCode(ctx.getSource(), StringArgumentType.getString(ctx, "code")))))
+            .then(Commands.literal("deleteall")
+                .requires(source -> source.hasPermission(2))
+                .executes(ctx -> deleteAllCodes(ctx.getSource())))
+            .then(Commands.literal("list")
+                .executes(ctx -> listCodes(ctx.getSource())))
             .then(Commands.literal("help")
                 .executes(ctx -> showHelp(ctx.getSource())))
         );
@@ -50,8 +55,11 @@ public class PromoCommand {
                 .requires(source -> source.hasPermission(2))
                 .then(Commands.argument("code", StringArgumentType.word())
                     .executes(ctx -> deleteCode(ctx.getSource(), StringArgumentType.getString(ctx, "code")))))
-            .then(Commands.literal("help")
-                .executes(ctx -> showHelp(ctx.getSource())))
+            .then(Commands.literal("deleteall")
+                .requires(source -> source.hasPermission(2))
+                .executes(ctx -> deleteAllCodes(ctx.getSource())))
+            .then(Commands.literal("list")
+                .executes(ctx -> listCodes(ctx.getSource())))
         );
     }
 
@@ -179,14 +187,14 @@ public class PromoCommand {
 
         switch (result) {
             case SUCCESS:
-                source.sendSuccess(new StringTextComponent("§aPromo code created successfully."), true);
+                source.sendSuccess(new StringTextComponent("Promo code created successfully."), true);
                 break;
             case DUPLICATE_CODE:
-                source.sendFailure(new StringTextComponent("§cA promo code with this name already exists."));
+                source.sendFailure(new StringTextComponent("A promo code with this name already exists."));
                 break;
             default:
                 source.sendFailure(new StringTextComponent(
-                    "§cInvalid format. Use /promocode help for examples."
+                    "Invalid format. Use /promocode help for examples."
                 ));
                 break;
         }
@@ -199,13 +207,13 @@ public class PromoCommand {
 
         switch (result) {
             case SUCCESS:
-                source.sendSuccess(new StringTextComponent("§aPromo code created. Players can now redeem it."), true);
+                source.sendSuccess(new StringTextComponent("Promo code created. Players can now redeem it."), true);
                 break;
             case DUPLICATE_CODE:
-                source.sendFailure(new StringTextComponent("§cCode already exists. Choose another name."));
+                source.sendFailure(new StringTextComponent("Code already exists. Choose another name."));
                 break;
             default:
-                source.sendFailure(new StringTextComponent("§cInvalid values. Check item id/count and try /promocode help."));
+                source.sendFailure(new StringTextComponent("Invalid values. Check item id/count and try /promocode help."));
                 break;
         }
 
@@ -239,12 +247,38 @@ public class PromoCommand {
         return result == PromoCodeManager.DeleteCodeResult.SUCCESS ? 1 : 0;
     }
 
+    private static int deleteAllCodes(CommandSource source) {
+        int deleted = PromoCodeManager.get().deleteAllCodes();
+        source.sendSuccess(new StringTextComponent("Deleted " + deleted + " promo code(s)."), true);
+        return deleted > 0 ? 1 : 0;
+    }
+
+    private static int listCodes(CommandSource source) {
+        source.sendSuccess(new StringTextComponent("=== ACTIVE PROMO CODES ==="), false);
+        
+        java.util.List<String> codes = PromoCodeManager.get().getAllCodesInfo();
+        
+        if (codes.isEmpty()) {
+            source.sendSuccess(new StringTextComponent("No promo codes available."), false);
+            return 0;
+        }
+        
+        for (String codeInfo : codes) {
+            source.sendSuccess(new StringTextComponent(codeInfo), false);
+        }
+        
+        source.sendSuccess(new StringTextComponent("Total: " + codes.size() + " code(s)"), false);
+        return codes.size();
+    }
+
     private static int showHelp(CommandSource source) {
         source.sendSuccess(new StringTextComponent("=== PROMO CODE HELP ==="), false);
         source.sendSuccess(new StringTextComponent("Create (1 item): /promocode create CODE item count [maxUses] [expiryEpoch]"), false);
         source.sendSuccess(new StringTextComponent("Create (multi):  /promocode create CODE item1 count1 item2 count2 [item3 count3] [maxUses] [expiryEpoch]"), false);
         source.sendSuccess(new StringTextComponent("Create (advanced): /promocode createraw CODE:item1,count1;item2,count2|maxUses|expiryEpoch"), false);
         source.sendSuccess(new StringTextComponent("Delete: /promocode delete CODE"), false);
+        source.sendSuccess(new StringTextComponent("Delete all: /promocode deleteall"), false);
+        source.sendSuccess(new StringTextComponent("List: /promocode list"), false);
         source.sendSuccess(new StringTextComponent("Help: /promocode help"), false);
         source.sendSuccess(new StringTextComponent(""), false);
         source.sendSuccess(new StringTextComponent("Notes:"), false);

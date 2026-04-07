@@ -29,11 +29,7 @@ public class PromoCodeConfig {
                     "Example: SUMMER2024:minecraft:diamond,5;minecraft:apple,10|50|0",
                     "Set expiryEpochSeconds to 0 for no expiry."
                 )
-                .defineList("codes", Arrays.asList(
-                    "EARLY_EASTER:minecraft:diamond,5;minecraft:golden_apple,3|100|0",
-                    "FREESTART:minecraft:iron_sword,1;minecraft:bread,10|200|0",
-                    "DIAMONDS4ALL:minecraft:diamond,64|10|0"
-                ), entry -> entry instanceof String);
+                .defineList("codes", Arrays.asList(), obj -> obj instanceof String);
 
             builder.pop();
         }

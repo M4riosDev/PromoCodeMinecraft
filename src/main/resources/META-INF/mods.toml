@@ -21,8 +21,22 @@ license="MIT"
     version="1.0.0"
     displayName="PromoCode Mod"
     description='''
-        Adds a promo code system to Minecraft.
-        Players type /promo or /promocode to open the GUI.
-        Codes are defined in the server config and give item rewards.
+        A complete promotional code system for Minecraft servers. Admins create codes with item rewards, players redeem them via a simple GUI.
+        
+        Features:
+        • Create promo codes with multiple item rewards
+        • Set maximum uses and expiration dates
+        • One redemption per player (anti-abuse protection)
+        • Real-time statistics tracking
+        • In-game command control
+        • Perfect for events, giveaways, and starter bonuses
+        
+        Commands:
+        /promo — Open redemption GUI
+        /promo create CODE item count — Create a code
+        /promo delete CODE — Remove a code
+        /promo help — Show all commands
+        
+        Works on offline and online servers. Server-side mod.
     '''
     logoFile="promocodemod.png"

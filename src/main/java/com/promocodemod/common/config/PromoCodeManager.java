@@ -23,6 +23,7 @@ public class PromoCodeManager {
     private final Map<String, Set<String>> redeemedByHWID = new HashMap<>();
     private final Map<String, Integer> redemptionCounts = new HashMap<>();
     private final List<String> customCodes = new ArrayList<>();
+    private final Set<String> deletedCodes = new HashSet<>();
 
     private Path dataFile;
 
@@ -58,6 +59,9 @@ public class PromoCodeManager {
                     customCodes.add(entry.trim());
                 }
             }
+
+            List<String> loadedDeletedCodes = (List<String>) root.getOrDefault("deletedCodes", new ArrayList<>());
+            deletedCodes.addAll(loadedDeletedCodes);
         } catch (Exception e) {
             LOGGER.error("Failed to load promo code data", e);
         }
@@ -71,6 +75,7 @@ public class PromoCodeManager {
             root.put("redeemed", redeemed);
             root.put("counts", redemptionCounts);
             root.put("customCodes", customCodes);
+            root.put("deletedCodes", new ArrayList<>(deletedCodes));
             GSON.toJson(root, w);
         } catch (Exception e) {
             LOGGER.error("Failed to save promo code data", e);
@@ -184,7 +189,12 @@ public class PromoCodeManager {
 
     private List<String> getAllCodeEntries() {
         List<String> entries = new ArrayList<>();
-        entries.addAll(PromoCodeConfig.SERVER.promoCodes.get());
+        for (String code : PromoCodeConfig.SERVER.promoCodes.get()) {
+            PromoDefinition def = parseEntry(code);
+            if (def != null && !deletedCodes.contains(def.code)) {
+                entries.add(code);
+            }
+        }
         entries.addAll(customCodes);
         return entries;
     }
@@ -290,6 +300,49 @@ public class PromoCodeManager {
             }
         }
         
+        // Mark config codes as deleted
+        for (String code : PromoCodeConfig.SERVER.promoCodes.get()) {
+            PromoDefinition def = parseEntry(code);
+            if (def != null && def.code.equals(upperCode)) {
+                deletedCodes.add(upperCode);
+                save();
+                return DeleteCodeResult.SUCCESS;
+            }
+        }
+        
         return DeleteCodeResult.CODE_NOT_FOUND;
+    }
+
+    public synchronized List<String> getAllCodesInfo() {
+        List<String> info = new ArrayList<>();
+        for (String entry : getAllCodeEntries()) {
+            PromoDefinition def = parseEntry(entry);
+            if (def != null) {
+                int used = redemptionCounts.getOrDefault(def.code, 0);
+                String maxUsesStr = def.maxUses > 0 ? String.valueOf(def.maxUses) : "∞";
+                String expiryStr = def.expiryEpoch > 0 ? " | Expires: " + new java.util.Date(def.expiryEpoch * 1000) : "";
+                String status = "§f" + def.code + "§7: §b" + used + "/" + maxUsesStr + expiryStr;
+                info.add(status);
+            }
+        }
+        return info;
+    }
+
+    public synchronized int deleteAllCodes() {
+        int deleted = customCodes.size();
+        
+        // Also mark config codes as deleted
+        for (String code : PromoCodeConfig.SERVER.promoCodes.get()) {
+            PromoDefinition def = parseEntry(code);
+            if (def != null) {
+                deletedCodes.add(def.code);
+                deleted++;
+            }
+        }
+        
+        customCodes.clear();
+        redemptionCounts.clear();
+        save();
+        return deleted;
     }
 }
