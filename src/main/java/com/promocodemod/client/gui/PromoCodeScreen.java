@@ -9,7 +9,6 @@ import net.minecraft.util.text.StringTextComponent;
 
 public class PromoCodeScreen extends Screen {
 
-    // Width/height of the popup panel
     private static final int BOX_W = 220;
     private static final int BOX_H = 160;
     private static final String PLACEHOLDER = "Enter promo code...";
@@ -21,7 +20,6 @@ public class PromoCodeScreen extends Screen {
     private boolean feedbackSuccess = false;
     private int feedbackTimer = 0;
 
-    // Static so the network packet can write to it from any thread
     private static String pendingMessage = null;
     private static boolean pendingSuccess = false;
     private static int pendingRedeemedTotal = 0;
@@ -43,7 +41,6 @@ public class PromoCodeScreen extends Screen {
         int x = (width - BOX_W) / 2;
         int y = (height - BOX_H) / 2;
 
-        // Text field for the code
         codeField = new TextFieldWidget(font,
             x + 10, y + 60, BOX_W - 20, 20,
             new StringTextComponent(""));
@@ -52,7 +49,6 @@ public class PromoCodeScreen extends Screen {
         codeField.setFocus(true);
         addWidget(codeField);
 
-        // Confirm button
         confirmButton = new Button(
             x + 10, y + 90, BOX_W - 20, 20,
             new StringTextComponent("✔ CONFIRM"),
@@ -74,7 +70,6 @@ public class PromoCodeScreen extends Screen {
         NetworkHandler.CHANNEL.sendToServer(new NetworkHandler.RedeemCodePacket(code));
     }
 
-    /** Called by the network handler when the server responds. */
     public static void handleResult(boolean success, String message) {
         pendingSuccess = success;
         pendingMessage = message;
@@ -91,7 +86,6 @@ public class PromoCodeScreen extends Screen {
         super.tick();
         codeField.tick();
 
-        // Poll pending network result (arrives on netty thread, applied here on render thread)
         if (pendingMessage != null) {
             feedbackSuccess = pendingSuccess;
             feedbackMessage = pendingMessage;
@@ -111,37 +105,24 @@ public class PromoCodeScreen extends Screen {
 
     @Override
     public void render(MatrixStack ms, int mx, int my, float pt) {
-        // Dim background
         renderBackground(ms);
 
         int x = (width - BOX_W) / 2;
         int y = (height - BOX_H) / 2;
-
-        // Panel background
         fill(ms, x, y, x + BOX_W, y + BOX_H, 0xCC1E1E1E);
-
-        // Top accent bar (green like the original)
         fill(ms, x, y, x + BOX_W, y + 3, 0xFF3CB043);
-
-        // Bottom bar
         fill(ms, x, y + BOX_H - 3, x + BOX_W, y + BOX_H, 0xFF3CB043);
-
-        // Title
         drawCenteredString(ms, font, "§a✦ PROMO CODES ✦", width / 2, y + 10, 0xFFFFFF);
-
-        // Subtitle
         drawCenteredString(ms, font,
             "§7Enter your code and press Confirm!",
             width / 2, y + 24, 0xFFFFFF);
 
-        // Live usage stats from server
         String capacity = maxCapacity > 0 ? String.valueOf(maxCapacity) : "inf";
         String slots = "§7Redeemed: §a" + redeemedTotal + "/" + capacity;
         String users = "§7Players: §b" + redeemedPlayers;
         drawString(ms, font, slots, x + 8, y + BOX_H - 16, 0xFFFFFF);
         drawString(ms, font, users, x + BOX_W - font.width("Players: " + redeemedPlayers) - 8, y + BOX_H - 16, 0xFFFFFF);
 
-        // Feedback message
         if (feedbackTimer > 0 && !feedbackMessage.isEmpty()) {
             drawCenteredString(ms, font, feedbackMessage,
                 width / 2, y + 118, 0xFFFFFF);
@@ -156,7 +137,6 @@ public class PromoCodeScreen extends Screen {
 
     @Override
     public boolean keyPressed(int key, int scan, int mod) {
-        // Enter key submits
         if (key == 257 || key == 335) {
             redeemCode();
             return true;

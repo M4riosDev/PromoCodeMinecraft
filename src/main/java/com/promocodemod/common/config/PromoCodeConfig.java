@@ -18,10 +18,6 @@ public class PromoCodeConfig {
     }
 
     public static class ServerConfig {
-
-        // Format: "CODE:item1,count1;item2,count2|maxUses|expiryEpoch"
-        // Example: "EARLY_EASTER:minecraft:diamond,5;minecraft:golden_apple,3|100|0"
-        // expiryEpoch = 0 means never expires
         public final ForgeConfigSpec.ConfigValue<List<? extends String>> promoCodes;
 
         ServerConfig(ForgeConfigSpec.Builder builder) {

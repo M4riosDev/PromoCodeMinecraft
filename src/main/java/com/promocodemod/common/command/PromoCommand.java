@@ -1,35 +1,150 @@
 package com.promocodemod.common.command;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.LongArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.ArgumentBuilder;
+import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.promocodemod.common.config.PromoCodeManager;
 import com.promocodemod.common.network.NetworkHandler;
 import net.minecraft.command.CommandSource;
 import net.minecraft.command.Commands;
+import net.minecraft.command.ISuggestionProvider;
 import net.minecraft.entity.player.ServerPlayerEntity;
 import net.minecraft.util.text.StringTextComponent;
 import net.minecraftforge.fml.network.NetworkDirection;
+import net.minecraftforge.registries.ForgeRegistries;
 
 public class PromoCommand {
+
+    private static final SuggestionProvider<CommandSource> ITEM_SUGGESTIONS =
+        (context, builder) -> ISuggestionProvider.suggestResource(ForgeRegistries.ITEMS.getKeys(), builder);
 
     public static void register(CommandDispatcher<CommandSource> dispatcher) {
         dispatcher.register(Commands.literal("promo")
             .executes(ctx -> {
                 return openGui(ctx.getSource());
             })
-            .then(Commands.literal("create")
+            .then(buildCreateNode())
+            .then(Commands.literal("createraw")
                 .requires(source -> source.hasPermission(2))
                 .then(Commands.argument("definition", StringArgumentType.greedyString())
                     .executes(ctx -> createCode(ctx.getSource(), StringArgumentType.getString(ctx, "definition")))))
+            .then(Commands.literal("help")
+                .executes(ctx -> showHelp(ctx.getSource())))
         );
 
         dispatcher.register(Commands.literal("promocode")
             .executes(ctx -> openGui(ctx.getSource()))
-            .then(Commands.literal("create")
+            .then(buildCreateNode())
+            .then(Commands.literal("createraw")
                 .requires(source -> source.hasPermission(2))
                 .then(Commands.argument("definition", StringArgumentType.greedyString())
                     .executes(ctx -> createCode(ctx.getSource(), StringArgumentType.getString(ctx, "definition")))))
+            .then(Commands.literal("help")
+                .executes(ctx -> showHelp(ctx.getSource())))
         );
+    }
+
+    private static ArgumentBuilder<CommandSource, ?> buildCreateNode() {
+        return Commands.literal("create")
+            .requires(source -> source.hasPermission(2))
+            .then(Commands.argument("code", StringArgumentType.word())
+                .then(Commands.argument("item1", ItemIdArgument.itemId())
+                    .suggests(ITEM_SUGGESTIONS)
+                    .then(Commands.argument("count1", IntegerArgumentType.integer(1, 64))
+                        .executes(ctx -> createMultiItemCode(
+                            ctx.getSource(),
+                            StringArgumentType.getString(ctx, "code"),
+                            new String[]{ItemIdArgument.getItemId(ctx, "item1")},
+                            new Integer[]{IntegerArgumentType.getInteger(ctx, "count1")},
+                            0,
+                            0L
+                        ))
+                        // Optional: item2 + count2
+                        .then(Commands.argument("item2", ItemIdArgument.itemId())
+                            .suggests(ITEM_SUGGESTIONS)
+                            .then(Commands.argument("count2", IntegerArgumentType.integer(1, 64))
+                                .executes(ctx -> createMultiItemCode(
+                                    ctx.getSource(),
+                                    StringArgumentType.getString(ctx, "code"),
+                                    new String[]{ItemIdArgument.getItemId(ctx, "item1"), ItemIdArgument.getItemId(ctx, "item2")},
+                                    new Integer[]{IntegerArgumentType.getInteger(ctx, "count1"), IntegerArgumentType.getInteger(ctx, "count2")},
+                                    0,
+                                    0L
+                                ))
+                                // Optional: item3 + count3
+                                .then(Commands.argument("item3", ItemIdArgument.itemId())
+                                    .suggests(ITEM_SUGGESTIONS)
+                                    .then(Commands.argument("count3", IntegerArgumentType.integer(1, 64))
+                                        .executes(ctx -> createMultiItemCode(
+                                            ctx.getSource(),
+                                            StringArgumentType.getString(ctx, "code"),
+                                            new String[]{ItemIdArgument.getItemId(ctx, "item1"), ItemIdArgument.getItemId(ctx, "item2"), ItemIdArgument.getItemId(ctx, "item3")},
+                                            new Integer[]{IntegerArgumentType.getInteger(ctx, "count1"), IntegerArgumentType.getInteger(ctx, "count2"), IntegerArgumentType.getInteger(ctx, "count3")},
+                                            0,
+                                            0L
+                                        ))
+                                        // Optional: maxUses
+                                        .then(Commands.argument("maxUses", IntegerArgumentType.integer(0))
+                                            .executes(ctx -> createMultiItemCode(
+                                                ctx.getSource(),
+                                                StringArgumentType.getString(ctx, "code"),
+                                                new String[]{ItemIdArgument.getItemId(ctx, "item1"), ItemIdArgument.getItemId(ctx, "item2"), ItemIdArgument.getItemId(ctx, "item3")},
+                                                new Integer[]{IntegerArgumentType.getInteger(ctx, "count1"), IntegerArgumentType.getInteger(ctx, "count2"), IntegerArgumentType.getInteger(ctx, "count3")},
+                                                IntegerArgumentType.getInteger(ctx, "maxUses"),
+                                                0L
+                                            ))
+                                            // Optional: expiryEpoch
+                                            .then(Commands.argument("expiryEpoch", LongArgumentType.longArg(0L))
+                                                .executes(ctx -> createMultiItemCode(
+                                                    ctx.getSource(),
+                                                    StringArgumentType.getString(ctx, "code"),
+                                                    new String[]{ItemIdArgument.getItemId(ctx, "item1"), ItemIdArgument.getItemId(ctx, "item2"), ItemIdArgument.getItemId(ctx, "item3")},
+                                                    new Integer[]{IntegerArgumentType.getInteger(ctx, "count1"), IntegerArgumentType.getInteger(ctx, "count2"), IntegerArgumentType.getInteger(ctx, "count3")},
+                                                    IntegerArgumentType.getInteger(ctx, "maxUses"),
+                                                    LongArgumentType.getLong(ctx, "expiryEpoch")
+                                                ))))))
+                                // maxUses without item3
+                                .then(Commands.argument("maxUses", IntegerArgumentType.integer(0))
+                                    .executes(ctx -> createMultiItemCode(
+                                        ctx.getSource(),
+                                        StringArgumentType.getString(ctx, "code"),
+                                        new String[]{ItemIdArgument.getItemId(ctx, "item1"), ItemIdArgument.getItemId(ctx, "item2")},
+                                        new Integer[]{IntegerArgumentType.getInteger(ctx, "count1"), IntegerArgumentType.getInteger(ctx, "count2")},
+                                        IntegerArgumentType.getInteger(ctx, "maxUses"),
+                                        0L
+                                    ))
+                                    .then(Commands.argument("expiryEpoch", LongArgumentType.longArg(0L))
+                                        .executes(ctx -> createMultiItemCode(
+                                            ctx.getSource(),
+                                            StringArgumentType.getString(ctx, "code"),
+                                            new String[]{ItemIdArgument.getItemId(ctx, "item1"), ItemIdArgument.getItemId(ctx, "item2")},
+                                            new Integer[]{IntegerArgumentType.getInteger(ctx, "count1"), IntegerArgumentType.getInteger(ctx, "count2")},
+                                            IntegerArgumentType.getInteger(ctx, "maxUses"),
+                                            LongArgumentType.getLong(ctx, "expiryEpoch")
+                                        )))))
+                        )
+                        // maxUses without item2
+                        .then(Commands.argument("maxUses", IntegerArgumentType.integer(0))
+                            .executes(ctx -> createMultiItemCode(
+                                ctx.getSource(),
+                                StringArgumentType.getString(ctx, "code"),
+                                new String[]{ItemIdArgument.getItemId(ctx, "item1")},
+                                new Integer[]{IntegerArgumentType.getInteger(ctx, "count1")},
+                                IntegerArgumentType.getInteger(ctx, "maxUses"),
+                                0L
+                            ))
+                            .then(Commands.argument("expiryEpoch", LongArgumentType.longArg(0L))
+                                .executes(ctx -> createMultiItemCode(
+                                    ctx.getSource(),
+                                    StringArgumentType.getString(ctx, "code"),
+                                    new String[]{ItemIdArgument.getItemId(ctx, "item1")},
+                                    new Integer[]{IntegerArgumentType.getInteger(ctx, "count1")},
+                                    IntegerArgumentType.getInteger(ctx, "maxUses"),
+                                    LongArgumentType.getLong(ctx, "expiryEpoch")
+                                )))))));
     }
 
     private static int openGui(CommandSource source) {
@@ -63,11 +178,50 @@ public class PromoCommand {
                 break;
             default:
                 source.sendFailure(new StringTextComponent(
-                    "§cInvalid format. Use: CODE:item1,count1;item2,count2|maxUses|expiryEpoch"
+                    "§cInvalid format. Use /promocode help for examples."
                 ));
                 break;
         }
 
         return result == PromoCodeManager.AddCodeResult.SUCCESS ? 1 : 0;
+    }
+
+    private static int createEasyCode(CommandSource source, String code, String itemId, int count, int maxUses, long expiryEpoch) {
+        PromoCodeManager.AddCodeResult result = PromoCodeManager.get().addSimpleCode(code, itemId, count, maxUses, expiryEpoch);
+
+        switch (result) {
+            case SUCCESS:
+                source.sendSuccess(new StringTextComponent("§aPromo code created. Players can now redeem it."), true);
+                break;
+            case DUPLICATE_CODE:
+                source.sendFailure(new StringTextComponent("§cCode already exists. Choose another name."));
+                break;
+            default:
+                source.sendFailure(new StringTextComponent("§cInvalid values. Check item id/count and try /promocode help."));
+                break;
+        }
+
+        return result == PromoCodeManager.AddCodeResult.SUCCESS ? 1 : 0;
+    }
+
+    private static int createMultiItemCode(CommandSource source, String code, String[] items, Integer[] counts, int maxUses, long expiryEpoch) {
+        // Build raw format: CODE:item1,count1;item2,count2|maxUses|expiryEpoch
+        StringBuilder definition = new StringBuilder(code).append(":");
+        for (int i = 0; i < items.length; i++) {
+            if (i > 0) definition.append(";");
+            definition.append(items[i]).append(",").append(counts[i]);
+        }
+        definition.append("|").append(maxUses).append("|").append(expiryEpoch);
+        
+        return createCode(source, definition.toString());
+    }
+
+    private static int showHelp(CommandSource source) {
+        source.sendSuccess(new StringTextComponent("§6PromoCode help:"), false);
+        source.sendSuccess(new StringTextComponent("§eSimple: §f/promocode create WELCOME minecraft:diamond 3 100 0"), false);
+        source.sendSuccess(new StringTextComponent("§7Item ids use underscore, e.g. minecraft:acacia_log"), false);
+        source.sendSuccess(new StringTextComponent("§7(maxUses=0 means unlimited, expiryEpoch=0 means never expires)"), false);
+        source.sendSuccess(new StringTextComponent("§eAdvanced: §f/promocode createraw CODE:item1,count1;item2,count2|maxUses|expiryEpoch"), false);
+        return 1;
     }
 }

@@ -20,7 +20,6 @@ public class EventHandler {
     @SubscribeEvent
     public static void onWorldLoad(WorldEvent.Load event) {
         if (!event.getWorld().isClientSide()) {
-            // Get the world save directory and init the manager
             net.minecraft.world.server.ServerWorld world = (net.minecraft.world.server.ServerWorld) event.getWorld();
             java.nio.file.Path saveDir = world.getServer().getWorldPath(net.minecraft.world.storage.FolderName.ROOT);
             PromoCodeManager.get().init(saveDir);

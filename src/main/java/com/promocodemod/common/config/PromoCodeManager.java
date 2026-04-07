@@ -20,12 +20,8 @@ public class PromoCodeManager {
 
     private static final Logger LOGGER = LogManager.getLogger();
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-
-    // uuid -> set of redeemed codes
     private final Map<String, Set<String>> redeemedCodes = new HashMap<>();
-    // code -> total redemptions so far
     private final Map<String, Integer> redemptionCounts = new HashMap<>();
-    // Extra codes created at runtime from command
     private final List<String> customCodes = new ArrayList<>();
 
     private Path dataFile;
@@ -132,7 +128,6 @@ public class PromoCodeManager {
         String trimmed = entry.trim();
         if (trimmed.isEmpty()) return null;
 
-        // CODE:item1,count1;item2,count2|maxUses|expiryEpoch
         String[] parts = trimmed.split("\\|");
         if (parts.length < 3) return null;
 
@@ -204,6 +199,25 @@ public class PromoCodeManager {
         customCodes.add(def.raw);
         save();
         return AddCodeResult.SUCCESS;
+    }
+
+    public synchronized AddCodeResult addSimpleCode(String code, String itemId, int count, int maxUses, long expiryEpoch) {
+        if (code == null || itemId == null) return AddCodeResult.INVALID_FORMAT;
+        if (count <= 0 || maxUses < 0 || expiryEpoch < 0) return AddCodeResult.INVALID_FORMAT;
+
+        String normalizedCode = code.trim().toUpperCase(Locale.ROOT);
+        if (!normalizedCode.matches("[A-Z0-9_-]+")) return AddCodeResult.INVALID_FORMAT;
+
+        ResourceLocation rl;
+        try {
+            rl = new ResourceLocation(itemId.trim());
+        } catch (Exception ex) {
+            return AddCodeResult.INVALID_FORMAT;
+        }
+        if (ForgeRegistries.ITEMS.getValue(rl) == null) return AddCodeResult.INVALID_FORMAT;
+
+        String rawDefinition = normalizedCode + ":" + rl.toString() + "," + count + "|" + maxUses + "|" + expiryEpoch;
+        return addCode(rawDefinition);
     }
 
     public synchronized Stats getStats() {
