@@ -31,6 +31,10 @@ public class PromoCommand {
                 .requires(source -> source.hasPermission(2))
                 .then(Commands.argument("definition", StringArgumentType.greedyString())
                     .executes(ctx -> createCode(ctx.getSource(), StringArgumentType.getString(ctx, "definition")))))
+            .then(Commands.literal("delete")
+                .requires(source -> source.hasPermission(2))
+                .then(Commands.argument("code", StringArgumentType.word())
+                    .executes(ctx -> deleteCode(ctx.getSource(), StringArgumentType.getString(ctx, "code")))))
             .then(Commands.literal("help")
                 .executes(ctx -> showHelp(ctx.getSource())))
         );
@@ -42,6 +46,10 @@ public class PromoCommand {
                 .requires(source -> source.hasPermission(2))
                 .then(Commands.argument("definition", StringArgumentType.greedyString())
                     .executes(ctx -> createCode(ctx.getSource(), StringArgumentType.getString(ctx, "definition")))))
+            .then(Commands.literal("delete")
+                .requires(source -> source.hasPermission(2))
+                .then(Commands.argument("code", StringArgumentType.word())
+                    .executes(ctx -> deleteCode(ctx.getSource(), StringArgumentType.getString(ctx, "code")))))
             .then(Commands.literal("help")
                 .executes(ctx -> showHelp(ctx.getSource())))
         );
@@ -216,12 +224,33 @@ public class PromoCommand {
         return createCode(source, definition.toString());
     }
 
+    private static int deleteCode(CommandSource source, String codeName) {
+        PromoCodeManager.DeleteCodeResult result = PromoCodeManager.get().deleteCode(codeName);
+
+        switch (result) {
+            case SUCCESS:
+                source.sendSuccess(new StringTextComponent("Promo code deleted successfully."), true);
+                break;
+            case CODE_NOT_FOUND:
+                source.sendFailure(new StringTextComponent("Code not found or cannot be deleted."));
+                break;
+        }
+
+        return result == PromoCodeManager.DeleteCodeResult.SUCCESS ? 1 : 0;
+    }
+
     private static int showHelp(CommandSource source) {
-        source.sendSuccess(new StringTextComponent("§6PromoCode help:"), false);
-        source.sendSuccess(new StringTextComponent("§eSimple: §f/promocode create WELCOME minecraft:diamond 3 100 0"), false);
-        source.sendSuccess(new StringTextComponent("§7Item ids use underscore, e.g. minecraft:acacia_log"), false);
-        source.sendSuccess(new StringTextComponent("§7(maxUses=0 means unlimited, expiryEpoch=0 means never expires)"), false);
-        source.sendSuccess(new StringTextComponent("§eAdvanced: §f/promocode createraw CODE:item1,count1;item2,count2|maxUses|expiryEpoch"), false);
+        source.sendSuccess(new StringTextComponent("=== PROMO CODE HELP ==="), false);
+        source.sendSuccess(new StringTextComponent("Create (1 item): /promocode create CODE item count [maxUses] [expiryEpoch]"), false);
+        source.sendSuccess(new StringTextComponent("Create (multi):  /promocode create CODE item1 count1 item2 count2 [item3 count3] [maxUses] [expiryEpoch]"), false);
+        source.sendSuccess(new StringTextComponent("Create (advanced): /promocode createraw CODE:item1,count1;item2,count2|maxUses|expiryEpoch"), false);
+        source.sendSuccess(new StringTextComponent("Delete: /promocode delete CODE"), false);
+        source.sendSuccess(new StringTextComponent("Help: /promocode help"), false);
+        source.sendSuccess(new StringTextComponent(""), false);
+        source.sendSuccess(new StringTextComponent("Notes:"), false);
+        source.sendSuccess(new StringTextComponent("- Item IDs: namespace:name (e.g., minecraft:diamond)"), false);
+        source.sendSuccess(new StringTextComponent("- maxUses=0 for unlimited, expiryEpoch=0 for never expires"), false);
+        source.sendSuccess(new StringTextComponent("- Each player can only redeem each code once"), false);
         return 1;
     }
 }

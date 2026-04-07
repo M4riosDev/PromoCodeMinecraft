@@ -20,7 +20,7 @@ public class PromoCodeManager {
 
     private static final Logger LOGGER = LogManager.getLogger();
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private final Map<String, Set<String>> redeemedCodes = new HashMap<>();
+    private final Map<String, Set<String>> redeemedByHWID = new HashMap<>();
     private final Map<String, Integer> redemptionCounts = new HashMap<>();
     private final List<String> customCodes = new ArrayList<>();
 
@@ -47,7 +47,7 @@ public class PromoCodeManager {
             if (root == null) return;
 
             Map<String, List<String>> redeemed = (Map<String, List<String>>) root.getOrDefault("redeemed", new HashMap<>());
-            redeemed.forEach((uuid, codes) -> redeemedCodes.put(uuid, new HashSet<>(codes)));
+            redeemed.forEach((hwid, codes) -> redeemedByHWID.put(hwid, new HashSet<>(codes)));
 
             Map<String, Double> counts = (Map<String, Double>) root.getOrDefault("counts", new HashMap<>());
             counts.forEach((code, count) -> redemptionCounts.put(code, count.intValue()));
@@ -67,7 +67,7 @@ public class PromoCodeManager {
         try (Writer w = new FileWriter(dataFile.toFile())) {
             Map<String, Object> root = new HashMap<>();
             Map<String, List<String>> redeemed = new HashMap<>();
-            redeemedCodes.forEach((uuid, codes) -> redeemed.put(uuid, new ArrayList<>(codes)));
+            redeemedByHWID.forEach((hwid, codes) -> redeemed.put(hwid, new ArrayList<>(codes)));
             root.put("redeemed", redeemed);
             root.put("counts", redemptionCounts);
             root.put("customCodes", customCodes);
@@ -93,6 +93,10 @@ public class PromoCodeManager {
 
     public enum AddCodeResult {
         SUCCESS, INVALID_FORMAT, DUPLICATE_CODE
+    }
+
+    public enum DeleteCodeResult {
+        SUCCESS, CODE_NOT_FOUND
     }
 
     public static class Stats {
@@ -235,14 +239,14 @@ public class PromoCodeManager {
         }
 
         int redeemedPlayers = 0;
-        for (Set<String> used : redeemedCodes.values()) {
+        for (Set<String> used : redeemedByHWID.values()) {
             if (used != null && !used.isEmpty()) redeemedPlayers++;
         }
 
         return new Stats(redeemedTotal, maxCapacity, redeemedPlayers);
     }
 
-    public synchronized RedeemOutcome redeem(UUID playerUUID, String code) {
+    public synchronized RedeemOutcome redeem(String hwid, String code) {
         String upperCode = code.trim().toUpperCase();
         for (String entry : getAllCodeEntries()) {
             PromoDefinition def = parseEntry(entry);
@@ -257,13 +261,12 @@ public class PromoCodeManager {
                 return new RedeemOutcome(RedeemResult.MAX_USES_REACHED, Collections.emptyList());
             }
 
-            String uuid = playerUUID.toString();
-            Set<String> playerCodes = redeemedCodes.computeIfAbsent(uuid, k -> new HashSet<>());
-            if (playerCodes.contains(upperCode)) {
+            Set<String> hwidCodes = redeemedByHWID.computeIfAbsent(hwid, k -> new HashSet<>());
+            if (hwidCodes.contains(upperCode)) {
                 return new RedeemOutcome(RedeemResult.ALREADY_USED, Collections.emptyList());
             }
 
-            playerCodes.add(upperCode);
+            hwidCodes.add(upperCode);
             redemptionCounts.put(upperCode, usedCount + 1);
             save();
 
@@ -271,5 +274,22 @@ public class PromoCodeManager {
         }
 
         return new RedeemOutcome(RedeemResult.INVALID_CODE, Collections.emptyList());
+    }
+
+    public synchronized DeleteCodeResult deleteCode(String codeName) {
+        String upperCode = codeName.trim().toUpperCase();
+        
+        // Try to remove from custom codes
+        for (int i = 0; i < customCodes.size(); i++) {
+            PromoDefinition def = parseEntry(customCodes.get(i));
+            if (def != null && def.code.equals(upperCode)) {
+                customCodes.remove(i);
+                redemptionCounts.remove(upperCode);
+                save();
+                return DeleteCodeResult.SUCCESS;
+            }
+        }
+        
+        return DeleteCodeResult.CODE_NOT_FOUND;
     }
 }

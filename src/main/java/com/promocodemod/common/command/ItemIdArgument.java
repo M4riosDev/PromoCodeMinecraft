@@ -44,7 +44,7 @@ public class ItemIdArgument implements ArgumentType<String> {
         if (!itemId.contains(":")) {
             throw CommandSyntaxException.BUILT_IN_EXCEPTIONS
                 .dispatcherUnknownCommand()
-                .createWithContext(reader, "Item ID must be in format 'namespace:name' (e.g., minecraft:diamond)");
+                .createWithContext(reader);
         }
         
         return itemId;

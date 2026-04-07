@@ -1,6 +1,7 @@
 package com.promocodemod.common.network;
 
 import com.promocodemod.PromoCodeMod;
+import com.promocodemod.client.HWIDManager;
 import com.promocodemod.client.gui.PromoCodeScreen;
 import com.promocodemod.common.config.PromoCodeManager;
 import net.minecraft.client.Minecraft;
@@ -33,14 +34,27 @@ public class NetworkHandler {
 
     public static class RedeemCodePacket {
         public final String code;
-        public RedeemCodePacket(String code) { this.code = code; }
-        public static void encode(RedeemCodePacket p, PacketBuffer b) { b.writeUtf(p.code, 64); }
-        public static RedeemCodePacket decode(PacketBuffer b) { return new RedeemCodePacket(b.readUtf(64)); }
+        public final String hwid;
+        
+        public RedeemCodePacket(String code, String hwid) { 
+            this.code = code;
+            this.hwid = hwid;
+        }
+        
+        public static void encode(RedeemCodePacket p, PacketBuffer b) { 
+            b.writeUtf(p.code, 64);
+            b.writeUtf(p.hwid, 64);
+        }
+        
+        public static RedeemCodePacket decode(PacketBuffer b) { 
+            return new RedeemCodePacket(b.readUtf(64), b.readUtf(64)); 
+        }
+        
         public static void handle(RedeemCodePacket pkt, Supplier<NetworkEvent.Context> ctx) {
             ctx.get().enqueueWork(() -> {
                 ServerPlayerEntity player = ctx.get().getSender();
                 if (player == null) return;
-                PromoCodeManager.RedeemOutcome outcome = PromoCodeManager.get().redeem(player.getUUID(), pkt.code);
+                PromoCodeManager.RedeemOutcome outcome = PromoCodeManager.get().redeem(pkt.hwid, pkt.code);
                 boolean success = false;
                 String msg;
                 switch (outcome.result) {

@@ -1,6 +1,7 @@
 package com.promocodemod.client.gui;
 
 import com.mojang.blaze3d.matrix.MatrixStack;
+import com.promocodemod.client.HWIDManager;
 import com.promocodemod.common.network.NetworkHandler;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.TextFieldWidget;
@@ -51,7 +52,7 @@ public class PromoCodeScreen extends Screen {
 
         confirmButton = new Button(
             x + 10, y + 90, BOX_W - 20, 20,
-            new StringTextComponent("✔ CONFIRM"),
+            new StringTextComponent("CONFIRM"),
             btn -> redeemCode()
         );
         addButton(confirmButton);
@@ -67,7 +68,7 @@ public class PromoCodeScreen extends Screen {
         }
         feedbackMessage = "§7Checking...";
         feedbackTimer = 200;
-        NetworkHandler.CHANNEL.sendToServer(new NetworkHandler.RedeemCodePacket(code));
+        NetworkHandler.CHANNEL.sendToServer(new NetworkHandler.RedeemCodePacket(code, HWIDManager.getHWID()));
     }
 
     public static void handleResult(boolean success, String message) {
@@ -109,20 +110,28 @@ public class PromoCodeScreen extends Screen {
 
         int x = (width - BOX_W) / 2;
         int y = (height - BOX_H) / 2;
+        
+        // Main box
         fill(ms, x, y, x + BOX_W, y + BOX_H, 0xCC1E1E1E);
+        // Top border
         fill(ms, x, y, x + BOX_W, y + 3, 0xFF3CB043);
+        // Bottom border
         fill(ms, x, y + BOX_H - 3, x + BOX_W, y + BOX_H, 0xFF3CB043);
-        drawCenteredString(ms, font, "§a✦ PROMO CODES ✦", width / 2, y + 10, 0xFFFFFF);
+        
+        // Title
+        drawCenteredString(ms, font, "PROMO CODES", width / 2, y + 10, 0x3CB043);
         drawCenteredString(ms, font,
-            "§7Enter your code and press Confirm!",
-            width / 2, y + 24, 0xFFFFFF);
+            "Enter your code and press Confirm",
+            width / 2, y + 25, 0xAAAAAA);
 
-        String capacity = maxCapacity > 0 ? String.valueOf(maxCapacity) : "inf";
-        String slots = "§7Redeemed: §a" + redeemedTotal + "/" + capacity;
-        String users = "§7Players: §b" + redeemedPlayers;
-        drawString(ms, font, slots, x + 8, y + BOX_H - 16, 0xFFFFFF);
-        drawString(ms, font, users, x + BOX_W - font.width("Players: " + redeemedPlayers) - 8, y + BOX_H - 16, 0xFFFFFF);
+        // Stats
+        String capacity = maxCapacity > 0 ? String.valueOf(maxCapacity) : "∞";
+        String slots = "Redeemed: " + redeemedTotal + "/" + capacity;
+        String users = "Players: " + redeemedPlayers;
+        drawString(ms, font, slots, x + 8, y + BOX_H - 16, 0x3CB043);
+        drawString(ms, font, users, x + BOX_W - font.width(users) - 8, y + BOX_H - 16, 0x5DADE2);
 
+        // Feedback message
         if (feedbackTimer > 0 && !feedbackMessage.isEmpty()) {
             drawCenteredString(ms, font, feedbackMessage,
                 width / 2, y + 118, 0xFFFFFF);
