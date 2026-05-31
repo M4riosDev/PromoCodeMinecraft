@@ -61,12 +61,12 @@ public class PromoCodeScreen extends Screen {
     private void redeemCode() {
         String code = codeField.getValue().trim();
         if (code.isEmpty()) {
-            feedbackMessage = "§ePlease enter a code!";
+            feedbackMessage = "\u00a7ePlease enter a code!";
             feedbackSuccess = false;
             feedbackTimer = 80;
             return;
         }
-        feedbackMessage = "§7Checking...";
+        feedbackMessage = "\u00a77Checking...";
         feedbackTimer = 200;
         NetworkHandler.CHANNEL.sendToServer(new NetworkHandler.RedeemCodePacket(code, HWIDManager.getHWID()));
     }
@@ -111,27 +111,25 @@ public class PromoCodeScreen extends Screen {
         int x = (width - BOX_W) / 2;
         int y = (height - BOX_H) / 2;
         
-        // Main box
+
         fill(ms, x, y, x + BOX_W, y + BOX_H, 0xCC1E1E1E);
-        // Top border
         fill(ms, x, y, x + BOX_W, y + 3, 0xFF3CB043);
-        // Bottom border
         fill(ms, x, y + BOX_H - 3, x + BOX_W, y + BOX_H, 0xFF3CB043);
         
-        // Title
+
         drawCenteredString(ms, font, "PROMO CODES", width / 2, y + 10, 0x3CB043);
         drawCenteredString(ms, font,
             "Enter your code and press Confirm",
             width / 2, y + 25, 0xAAAAAA);
 
-        // Stats
-        String capacity = maxCapacity > 0 ? String.valueOf(maxCapacity) : "∞";
+
+        String capacity = String.valueOf(maxCapacity);
         String slots = "Redeemed: " + redeemedTotal + "/" + capacity;
         String users = "Players: " + redeemedPlayers;
         drawString(ms, font, slots, x + 8, y + BOX_H - 16, 0x3CB043);
         drawString(ms, font, users, x + BOX_W - font.width(users) - 8, y + BOX_H - 16, 0x5DADE2);
 
-        // Feedback message
+
         if (feedbackTimer > 0 && !feedbackMessage.isEmpty()) {
             drawCenteredString(ms, font, feedbackMessage,
                 width / 2, y + 118, 0xFFFFFF);

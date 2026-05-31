@@ -20,13 +20,15 @@ public class PromoCodeManager {
 
     private static final Logger LOGGER = LogManager.getLogger();
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+
+    private final Map<String, Set<String>> redeemedByUUID = new HashMap<>();
     private final Map<String, Set<String>> redeemedByHWID = new HashMap<>();
+
     private final Map<String, Integer> redemptionCounts = new HashMap<>();
     private final List<String> customCodes = new ArrayList<>();
     private final Set<String> deletedCodes = new HashSet<>();
 
     private Path dataFile;
-
     private static PromoCodeManager INSTANCE;
 
     public static PromoCodeManager get() {
@@ -47,21 +49,24 @@ public class PromoCodeManager {
             Map<String, Object> root = GSON.fromJson(r, type);
             if (root == null) return;
 
-            Map<String, List<String>> redeemed = (Map<String, List<String>>) root.getOrDefault("redeemed", new HashMap<>());
-            redeemed.forEach((hwid, codes) -> redeemedByHWID.put(hwid, new HashSet<>(codes)));
+            Map<String, List<String>> byUUID = (Map<String, List<String>>) root.getOrDefault("redeemedByUUID", new HashMap<>());
+            byUUID.forEach((uuid, codes) -> redeemedByUUID.put(uuid, new HashSet<>(codes)));
+
+            Map<String, List<String>> byHWID = (Map<String, List<String>>) root.getOrDefault("redeemedByHWID",
+                root.getOrDefault("redeemed", new HashMap<>()));
+            byHWID.forEach((hwid, codes) -> redeemedByHWID.put(hwid, new HashSet<>(codes)));
 
             Map<String, Double> counts = (Map<String, Double>) root.getOrDefault("counts", new HashMap<>());
             counts.forEach((code, count) -> redemptionCounts.put(code, count.intValue()));
 
             List<String> loadedCodes = (List<String>) root.getOrDefault("customCodes", new ArrayList<>());
             for (String entry : loadedCodes) {
-                if (entry != null && !entry.trim().isEmpty()) {
-                    customCodes.add(entry.trim());
-                }
+                if (entry != null && !entry.trim().isEmpty()) customCodes.add(entry.trim());
             }
 
-            List<String> loadedDeletedCodes = (List<String>) root.getOrDefault("deletedCodes", new ArrayList<>());
-            deletedCodes.addAll(loadedDeletedCodes);
+            List<String> loadedDeleted = (List<String>) root.getOrDefault("deletedCodes", new ArrayList<>());
+            deletedCodes.addAll(loadedDeleted);
+
         } catch (Exception e) {
             LOGGER.error("Failed to load promo code data", e);
         }
@@ -70,9 +75,15 @@ public class PromoCodeManager {
     private void save() {
         try (Writer w = new FileWriter(dataFile.toFile())) {
             Map<String, Object> root = new HashMap<>();
-            Map<String, List<String>> redeemed = new HashMap<>();
-            redeemedByHWID.forEach((hwid, codes) -> redeemed.put(hwid, new ArrayList<>(codes)));
-            root.put("redeemed", redeemed);
+
+            Map<String, List<String>> byUUID = new HashMap<>();
+            redeemedByUUID.forEach((uuid, codes) -> byUUID.put(uuid, new ArrayList<>(codes)));
+            root.put("redeemedByUUID", byUUID);
+
+            Map<String, List<String>> byHWID = new HashMap<>();
+            redeemedByHWID.forEach((hwid, codes) -> byHWID.put(hwid, new ArrayList<>(codes)));
+            root.put("redeemedByHWID", byHWID);
+
             root.put("counts", redemptionCounts);
             root.put("customCodes", customCodes);
             root.put("deletedCodes", new ArrayList<>(deletedCodes));
@@ -89,46 +100,33 @@ public class PromoCodeManager {
     public static class RedeemOutcome {
         public final RedeemResult result;
         public final List<ItemStack> rewards;
-
         public RedeemOutcome(RedeemResult result, List<ItemStack> rewards) {
             this.result = result;
             this.rewards = rewards;
         }
     }
 
-    public enum AddCodeResult {
-        SUCCESS, INVALID_FORMAT, DUPLICATE_CODE
-    }
-
-    public enum DeleteCodeResult {
-        SUCCESS, CODE_NOT_FOUND
-    }
+    public enum AddCodeResult    { SUCCESS, INVALID_FORMAT, DUPLICATE_CODE }
+    public enum DeleteCodeResult { SUCCESS, CODE_NOT_FOUND }
 
     public static class Stats {
-        public final int redeemedTotal;
-        public final int maxCapacity;
-        public final int redeemedPlayers;
-
+        public final int redeemedTotal, maxCapacity, redeemedPlayers;
         public Stats(int redeemedTotal, int maxCapacity, int redeemedPlayers) {
             this.redeemedTotal = redeemedTotal;
-            this.maxCapacity = maxCapacity;
+            this.maxCapacity   = maxCapacity;
             this.redeemedPlayers = redeemedPlayers;
         }
     }
 
     private static class PromoDefinition {
-        final String raw;
-        final String code;
+        final String raw, code;
         final List<ItemStack> rewards;
         final int maxUses;
         final long expiryEpoch;
 
         PromoDefinition(String raw, String code, List<ItemStack> rewards, int maxUses, long expiryEpoch) {
-            this.raw = raw;
-            this.code = code;
-            this.rewards = rewards;
-            this.maxUses = maxUses;
-            this.expiryEpoch = expiryEpoch;
+            this.raw = raw; this.code = code; this.rewards = rewards;
+            this.maxUses = maxUses; this.expiryEpoch = expiryEpoch;
         }
     }
 
@@ -149,36 +147,21 @@ public class PromoCodeManager {
         int maxUses;
         long expiryEpoch;
         try {
-            maxUses = Integer.parseInt(parts[1].trim());
+            maxUses     = Integer.parseInt(parts[1].trim());
             expiryEpoch = Long.parseLong(parts[2].trim());
-        } catch (NumberFormatException ex) {
-            return null;
-        }
-
+        } catch (NumberFormatException ex) { return null; }
         if (maxUses < 0 || expiryEpoch < 0) return null;
 
         List<ItemStack> rewards = new ArrayList<>();
-        String[] itemEntries = codePart[1].split(";");
-        for (String itemEntry : itemEntries) {
+        for (String itemEntry : codePart[1].split(";")) {
             String[] itemParts = itemEntry.trim().split(",");
             if (itemParts.length < 2) continue;
-
             ResourceLocation rl;
-            try {
-                rl = new ResourceLocation(itemParts[0].trim());
-            } catch (Exception ex) {
-                continue;
-            }
-
+            try { rl = new ResourceLocation(itemParts[0].trim().toLowerCase(java.util.Locale.ROOT)); } catch (Exception ex) { continue; }
             Item item = ForgeRegistries.ITEMS.getValue(rl);
             if (item == null) continue;
-
             int count;
-            try {
-                count = Integer.parseInt(itemParts[1].trim());
-            } catch (NumberFormatException ex) {
-                continue;
-            }
+            try { count = Integer.parseInt(itemParts[1].trim()); } catch (NumberFormatException ex) { continue; }
             if (count <= 0) continue;
             rewards.add(new ItemStack(item, count));
         }
@@ -191,91 +174,36 @@ public class PromoCodeManager {
         List<String> entries = new ArrayList<>();
         for (String code : PromoCodeConfig.SERVER.promoCodes.get()) {
             PromoDefinition def = parseEntry(code);
-            if (def != null && !deletedCodes.contains(def.code)) {
-                entries.add(code);
-            }
+            if (def != null && !deletedCodes.contains(def.code)) entries.add(code);
         }
         entries.addAll(customCodes);
         return entries;
     }
 
-    public synchronized AddCodeResult addCode(String rawDefinition) {
-        PromoDefinition def = parseEntry(rawDefinition);
-        if (def == null) return AddCodeResult.INVALID_FORMAT;
-
-        for (String existing : getAllCodeEntries()) {
-            PromoDefinition existingDef = parseEntry(existing);
-            if (existingDef != null && existingDef.code.equals(def.code)) {
-                return AddCodeResult.DUPLICATE_CODE;
-            }
-        }
-
-        customCodes.add(def.raw);
-        save();
-        return AddCodeResult.SUCCESS;
-    }
-
-    public synchronized AddCodeResult addSimpleCode(String code, String itemId, int count, int maxUses, long expiryEpoch) {
-        if (code == null || itemId == null) return AddCodeResult.INVALID_FORMAT;
-        if (count <= 0 || maxUses < 0 || expiryEpoch < 0) return AddCodeResult.INVALID_FORMAT;
-
-        String normalizedCode = code.trim().toUpperCase(Locale.ROOT);
-        if (!normalizedCode.matches("[A-Z0-9_-]+")) return AddCodeResult.INVALID_FORMAT;
-
-        ResourceLocation rl;
-        try {
-            rl = new ResourceLocation(itemId.trim());
-        } catch (Exception ex) {
-            return AddCodeResult.INVALID_FORMAT;
-        }
-        if (ForgeRegistries.ITEMS.getValue(rl) == null) return AddCodeResult.INVALID_FORMAT;
-
-        String rawDefinition = normalizedCode + ":" + rl.toString() + "," + count + "|" + maxUses + "|" + expiryEpoch;
-        return addCode(rawDefinition);
-    }
-
-    public synchronized Stats getStats() {
-        int redeemedTotal = 0;
-        for (Integer value : redemptionCounts.values()) {
-            if (value != null && value > 0) redeemedTotal += value;
-        }
-
-        int maxCapacity = 0;
-        for (String entry : getAllCodeEntries()) {
-            PromoDefinition def = parseEntry(entry);
-            if (def != null && def.maxUses > 0) {
-                maxCapacity += def.maxUses;
-            }
-        }
-
-        int redeemedPlayers = 0;
-        for (Set<String> used : redeemedByHWID.values()) {
-            if (used != null && !used.isEmpty()) redeemedPlayers++;
-        }
-
-        return new Stats(redeemedTotal, maxCapacity, redeemedPlayers);
-    }
-
-    public synchronized RedeemOutcome redeem(String hwid, String code) {
+    public synchronized RedeemOutcome redeem(String uuid, String hwid, String code) {
         String upperCode = code.trim().toUpperCase();
+
         for (String entry : getAllCodeEntries()) {
             PromoDefinition def = parseEntry(entry);
             if (def == null || !def.code.equals(upperCode)) continue;
 
-            if (def.expiryEpoch > 0 && System.currentTimeMillis() / 1000 > def.expiryEpoch) {
+            if (def.expiryEpoch > 0 && System.currentTimeMillis() / 1000 > def.expiryEpoch)
                 return new RedeemOutcome(RedeemResult.EXPIRED, Collections.emptyList());
-            }
 
             int usedCount = redemptionCounts.getOrDefault(upperCode, 0);
-            if (def.maxUses > 0 && usedCount >= def.maxUses) {
+            if (def.maxUses > 0 && usedCount >= def.maxUses)
                 return new RedeemOutcome(RedeemResult.MAX_USES_REACHED, Collections.emptyList());
-            }
 
-            Set<String> hwidCodes = redeemedByHWID.computeIfAbsent(hwid, k -> new HashSet<>());
-            if (hwidCodes.contains(upperCode)) {
+            Set<String> uuidCodes = redeemedByUUID.computeIfAbsent(uuid, k -> new HashSet<>());
+            if (uuidCodes.contains(upperCode))
                 return new RedeemOutcome(RedeemResult.ALREADY_USED, Collections.emptyList());
-            }
 
+        
+            Set<String> hwidCodes = redeemedByHWID.computeIfAbsent(hwid, k -> new HashSet<>());
+            if (hwidCodes.contains(upperCode))
+                return new RedeemOutcome(RedeemResult.ALREADY_USED, Collections.emptyList());
+
+            uuidCodes.add(upperCode);
             hwidCodes.add(upperCode);
             redemptionCounts.put(upperCode, usedCount + 1);
             save();
@@ -286,10 +214,48 @@ public class PromoCodeManager {
         return new RedeemOutcome(RedeemResult.INVALID_CODE, Collections.emptyList());
     }
 
+    public synchronized AddCodeResult addCode(String rawDefinition) {
+        PromoDefinition def = parseEntry(rawDefinition);
+        if (def == null) return AddCodeResult.INVALID_FORMAT;
+        for (String existing : getAllCodeEntries()) {
+            PromoDefinition e = parseEntry(existing);
+            if (e != null && e.code.equals(def.code)) return AddCodeResult.DUPLICATE_CODE;
+        }
+        customCodes.add(def.raw);
+        save();
+        return AddCodeResult.SUCCESS;
+    }
+
+    public synchronized AddCodeResult addSimpleCode(String code, String itemId, int count, int maxUses, long expiryEpoch) {
+        if (code == null || itemId == null) return AddCodeResult.INVALID_FORMAT;
+        if (count <= 0 || maxUses < 0 || expiryEpoch < 0) return AddCodeResult.INVALID_FORMAT;
+        String normalizedCode = code.trim().toUpperCase(Locale.ROOT);
+        if (!normalizedCode.matches("[A-Z0-9_-]+")) return AddCodeResult.INVALID_FORMAT;
+        ResourceLocation rl;
+        try { rl = new ResourceLocation(itemId.trim().toLowerCase(java.util.Locale.ROOT)); } catch (Exception ex) { return AddCodeResult.INVALID_FORMAT; }
+        if (ForgeRegistries.ITEMS.getValue(rl) == null) return AddCodeResult.INVALID_FORMAT;
+        String raw = normalizedCode + ":" + rl + "," + count + "|" + maxUses + "|" + expiryEpoch;
+        return addCode(raw);
+    }
+
+    public synchronized Stats getStats() {
+        int redeemedTotal = 0;
+        for (Integer v : redemptionCounts.values()) if (v != null && v > 0) redeemedTotal += v;
+
+        int maxCapacity = 0;
+        for (String entry : getAllCodeEntries()) {
+            PromoDefinition def = parseEntry(entry);
+            if (def != null && def.maxUses > 0) maxCapacity += def.maxUses;
+        }
+
+        int redeemedPlayers = 0;
+        for (Set<String> used : redeemedByUUID.values()) if (used != null && !used.isEmpty()) redeemedPlayers++;
+
+        return new Stats(redeemedTotal, maxCapacity, redeemedPlayers);
+    }
+
     public synchronized DeleteCodeResult deleteCode(String codeName) {
         String upperCode = codeName.trim().toUpperCase();
-        
-        // Try to remove from custom codes
         for (int i = 0; i < customCodes.size(); i++) {
             PromoDefinition def = parseEntry(customCodes.get(i));
             if (def != null && def.code.equals(upperCode)) {
@@ -299,8 +265,6 @@ public class PromoCodeManager {
                 return DeleteCodeResult.SUCCESS;
             }
         }
-        
-        // Mark config codes as deleted
         for (String code : PromoCodeConfig.SERVER.promoCodes.get()) {
             PromoDefinition def = parseEntry(code);
             if (def != null && def.code.equals(upperCode)) {
@@ -309,7 +273,6 @@ public class PromoCodeManager {
                 return DeleteCodeResult.SUCCESS;
             }
         }
-        
         return DeleteCodeResult.CODE_NOT_FOUND;
     }
 
@@ -319,10 +282,9 @@ public class PromoCodeManager {
             PromoDefinition def = parseEntry(entry);
             if (def != null) {
                 int used = redemptionCounts.getOrDefault(def.code, 0);
-                String maxUsesStr = def.maxUses > 0 ? String.valueOf(def.maxUses) : "∞";
-                String expiryStr = def.expiryEpoch > 0 ? " | Expires: " + new java.util.Date(def.expiryEpoch * 1000) : "";
-                String status = "§f" + def.code + "§7: §b" + used + "/" + maxUsesStr + expiryStr;
-                info.add(status);
+                String maxUsesStr = String.valueOf(def.maxUses);
+                String expiryStr  = def.expiryEpoch > 0 ? " | Expires: " + new java.util.Date(def.expiryEpoch * 1000) : "";
+                info.add("\u00a7f" + def.code + "\u00a77: \u00a7b" + used + "/" + maxUsesStr + expiryStr);
             }
         }
         return info;
@@ -330,16 +292,10 @@ public class PromoCodeManager {
 
     public synchronized int deleteAllCodes() {
         int deleted = customCodes.size();
-        
-        // Also mark config codes as deleted
         for (String code : PromoCodeConfig.SERVER.promoCodes.get()) {
             PromoDefinition def = parseEntry(code);
-            if (def != null) {
-                deletedCodes.add(def.code);
-                deleted++;
-            }
+            if (def != null) { deletedCodes.add(def.code); deleted++; }
         }
-        
         customCodes.clear();
         redemptionCounts.clear();
         save();

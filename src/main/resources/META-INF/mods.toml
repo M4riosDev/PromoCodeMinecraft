@@ -12,13 +12,13 @@ license="MIT"
 [[dependencies.promocodemod]]
     modId="minecraft"
     mandatory=true
-    versionRange="[1.16.5,1.17)"
+    versionRange="[1.16.5)"
     ordering="NONE"
     side="BOTH"
 
 [[mods]]
     modId="promocodemod"
-    version="1.0.0"
+    version="1.1.0"
     displayName="PromoCode Mod"
     description='''
         A complete promotional code system for Minecraft servers. Admins create codes with item rewards, players redeem them via a simple GUI.
