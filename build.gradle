@@ -12,7 +12,7 @@ apply plugin: 'net.minecraftforge.gradle'
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(8)
 
-version = '1.1.0'
+version = '1.2.0'
 group = 'com.promocodemod'
 archivesBaseName = 'promocodemod-1.16.5'
 

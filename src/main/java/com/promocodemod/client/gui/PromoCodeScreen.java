@@ -1,7 +1,7 @@
 package com.promocodemod.client.gui;
 
 import com.mojang.blaze3d.matrix.MatrixStack;
-import com.promocodemod.client.HWIDManager;
+import com.promocodemod.client.FingerprintManager;
 import com.promocodemod.common.network.NetworkHandler;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.TextFieldWidget;
@@ -21,14 +21,14 @@ public class PromoCodeScreen extends Screen {
     private boolean feedbackSuccess = false;
     private int feedbackTimer = 0;
 
-    private static String pendingMessage = null;
-    private static boolean pendingSuccess = false;
-    private static int pendingRedeemedTotal = 0;
-    private static int pendingMaxCapacity = 0;
-    private static int pendingRedeemedPlayers = 0;
+    private static String  pendingMessage       = null;
+    private static boolean pendingSuccess        = false;
+    private static int     pendingRedeemedTotal  = 0;
+    private static int     pendingMaxCapacity    = 0;
+    private static int     pendingRedeemedPlayers = 0;
 
-    private int redeemedTotal = 0;
-    private int maxCapacity = 0;
+    private int redeemedTotal   = 0;
+    private int maxCapacity     = 0;
     private int redeemedPlayers = 0;
 
     public PromoCodeScreen() {
@@ -38,7 +38,6 @@ public class PromoCodeScreen extends Screen {
     @Override
     protected void init() {
         super.init();
-
         int x = (width - BOX_W) / 2;
         int y = (height - BOX_H) / 2;
 
@@ -61,14 +60,23 @@ public class PromoCodeScreen extends Screen {
     private void redeemCode() {
         String code = codeField.getValue().trim();
         if (code.isEmpty()) {
-            feedbackMessage = "\u00a7ePlease enter a code!";
+            feedbackMessage = "?ePlease enter a code!";
             feedbackSuccess = false;
-            feedbackTimer = 80;
+            feedbackTimer   = 80;
             return;
         }
-        feedbackMessage = "\u00a77Checking...";
-        feedbackTimer = 200;
-        NetworkHandler.CHANNEL.sendToServer(new NetworkHandler.RedeemCodePacket(code, HWIDManager.getHWID()));
+
+        String hwHmac = FingerprintManager.getSignedFingerprint();
+        if (hwHmac == null) {
+            feedbackMessage = "?eConnecting... please try again.";
+            feedbackSuccess = false;
+            feedbackTimer   = 100;
+            return;
+        }
+
+        feedbackMessage = "?7Checking...";
+        feedbackTimer   = 200;
+        NetworkHandler.CHANNEL.sendToServer(new NetworkHandler.RedeemCodePacket(code, hwHmac));
     }
 
     public static void handleResult(boolean success, String message) {
@@ -77,8 +85,8 @@ public class PromoCodeScreen extends Screen {
     }
 
     public static void handleStats(int redeemedTotal, int maxCapacity, int redeemedPlayers) {
-        pendingRedeemedTotal = redeemedTotal;
-        pendingMaxCapacity = maxCapacity;
+        pendingRedeemedTotal   = redeemedTotal;
+        pendingMaxCapacity     = maxCapacity;
         pendingRedeemedPlayers = redeemedPlayers;
     }
 
@@ -90,15 +98,13 @@ public class PromoCodeScreen extends Screen {
         if (pendingMessage != null) {
             feedbackSuccess = pendingSuccess;
             feedbackMessage = pendingMessage;
-            feedbackTimer = 100;
-            pendingMessage = null;
-            if (feedbackSuccess) {
-                codeField.setValue("");
-            }
+            feedbackTimer   = 100;
+            pendingMessage  = null;
+            if (feedbackSuccess) codeField.setValue("");
         }
 
-        redeemedTotal = pendingRedeemedTotal;
-        maxCapacity = pendingMaxCapacity;
+        redeemedTotal   = pendingRedeemedTotal;
+        maxCapacity     = pendingMaxCapacity;
         redeemedPlayers = pendingRedeemedPlayers;
 
         if (feedbackTimer > 0) feedbackTimer--;
@@ -110,29 +116,23 @@ public class PromoCodeScreen extends Screen {
 
         int x = (width - BOX_W) / 2;
         int y = (height - BOX_H) / 2;
-        
 
         fill(ms, x, y, x + BOX_W, y + BOX_H, 0xCC1E1E1E);
         fill(ms, x, y, x + BOX_W, y + 3, 0xFF3CB043);
         fill(ms, x, y + BOX_H - 3, x + BOX_W, y + BOX_H, 0xFF3CB043);
-        
 
         drawCenteredString(ms, font, "PROMO CODES", width / 2, y + 10, 0x3CB043);
         drawCenteredString(ms, font,
             "Enter your code and press Confirm",
             width / 2, y + 25, 0xAAAAAA);
 
-
-        String capacity = String.valueOf(maxCapacity);
-        String slots = "Redeemed: " + redeemedTotal + "/" + capacity;
+        String slots = "Redeemed: " + redeemedTotal + "/" + maxCapacity;
         String users = "Players: " + redeemedPlayers;
         drawString(ms, font, slots, x + 8, y + BOX_H - 16, 0x3CB043);
         drawString(ms, font, users, x + BOX_W - font.width(users) - 8, y + BOX_H - 16, 0x5DADE2);
 
-
         if (feedbackTimer > 0 && !feedbackMessage.isEmpty()) {
-            drawCenteredString(ms, font, feedbackMessage,
-                width / 2, y + 118, 0xFFFFFF);
+            drawCenteredString(ms, font, feedbackMessage, width / 2, y + 118, 0xFFFFFF);
         }
 
         codeField.render(ms, mx, my, pt);
@@ -144,10 +144,7 @@ public class PromoCodeScreen extends Screen {
 
     @Override
     public boolean keyPressed(int key, int scan, int mod) {
-        if (key == 257 || key == 335) {
-            redeemCode();
-            return true;
-        }
+        if (key == 257 || key == 335) { redeemCode(); return true; }
         if (codeField.keyPressed(key, scan, mod)) return true;
         return super.keyPressed(key, scan, mod);
     }
@@ -159,7 +156,5 @@ public class PromoCodeScreen extends Screen {
     }
 
     @Override
-    public boolean isPauseScreen() {
-        return false;
-    }
+    public boolean isPauseScreen() { return false; }
 }

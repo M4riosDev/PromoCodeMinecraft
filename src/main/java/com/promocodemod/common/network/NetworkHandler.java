@@ -11,6 +11,10 @@ import net.minecraftforge.fml.network.NetworkEvent;
 import net.minecraftforge.fml.network.NetworkRegistry;
 import net.minecraftforge.fml.network.simple.SimpleChannel;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.function.Supplier;
 
 public class NetworkHandler {
@@ -29,20 +33,21 @@ public class NetworkHandler {
         CHANNEL.registerMessage(1, RedeemResultPacket.class, RedeemResultPacket::encode, RedeemResultPacket::decode, RedeemResultPacket::handle);
         CHANNEL.registerMessage(2, OpenGuiPacket.class,      OpenGuiPacket::encode,      OpenGuiPacket::decode,      OpenGuiPacket::handle);
         CHANNEL.registerMessage(3, PromoStatsPacket.class,   PromoStatsPacket::encode,   PromoStatsPacket::decode,   PromoStatsPacket::handle);
+        CHANNEL.registerMessage(4, SaltSyncPacket.class,     SaltSyncPacket::encode,     SaltSyncPacket::decode,     SaltSyncPacket::handle);
     }
 
     public static class RedeemCodePacket {
         public final String code;
-        public final String hwid;
+        public final String hwHmac; // HMAC-SHA256(hw_raw, sessionSalt)
 
-        public RedeemCodePacket(String code, String hwid) {
-            this.code = code;
-            this.hwid = hwid;
+        public RedeemCodePacket(String code, String hwHmac) {
+            this.code   = code;
+            this.hwHmac = hwHmac;
         }
 
         public static void encode(RedeemCodePacket p, PacketBuffer b) {
-            b.writeUtf(p.code, 64);
-            b.writeUtf(p.hwid, 64);
+            b.writeUtf(p.code,   64);
+            b.writeUtf(p.hwHmac, 64);
         }
 
         public static RedeemCodePacket decode(PacketBuffer b) {
@@ -55,30 +60,48 @@ public class NetworkHandler {
                 if (player == null) return;
 
                 String uuid = player.getUUID().toString();
-                String hwid = pkt.hwid;                   
 
-                PromoCodeManager.RedeemOutcome outcome = PromoCodeManager.get().redeem(uuid, hwid, pkt.code);
+                String sessionSalt = PromoCodeManager.get().getSessionSalt(uuid);
+                if (sessionSalt == null || !isValidHmacFormat(pkt.hwHmac)) {
+                    sendResult(player, false, "?cSession expired. Reopen the GUI.");
+                    return;
+                }
+
+
+                String ip          = player.connection.connection
+                                         .getRemoteAddress().toString()
+                                         .replaceAll("/", "")
+                                         .replaceAll(":\\d+$", ""); // strip port
+                String fingerprint = sha256Hex(sessionSalt + "|" + pkt.hwHmac + "|" + ip);
+
+                PromoCodeManager.RedeemOutcome outcome =
+                    PromoCodeManager.get().redeem(uuid, fingerprint, pkt.code);
+
                 boolean success = false;
                 String msg;
                 switch (outcome.result) {
                     case SUCCESS:
-                        msg = "\u00a7aCode redeemed! Enjoy your rewards!";
+                        msg = "?aCode redeemed! Enjoy your rewards!";
                         success = true;
                         for (ItemStack stack : outcome.rewards)
                             if (!player.inventory.add(stack)) player.drop(stack, false);
                         break;
-                    case ALREADY_USED:     msg = "\u00a7cYou have already used this code!";         break;
-                    case MAX_USES_REACHED: msg = "\u00a7cThis code has reached its maximum uses!";   break;
-                    case EXPIRED:          msg = "\u00a7cThis promo code has expired!";              break;
-                    default:               msg = "\u00a7cInvalid promo code. Please try again.";     break;
+                    case ALREADY_USED:
+                        msg = "?cYou have already used this code!";
+                        break;
+                    case MAX_USES_REACHED:
+                        msg = "?cThis code has reached its maximum uses!";
+                        break;
+                    case EXPIRED:
+                        msg = "?cThis promo code has expired!";
+                        break;
+                    default:
+                        msg = "?cInvalid promo code. Please try again.";
+                        break;
                 }
 
                 PromoCodeManager.Stats stats = PromoCodeManager.get().getStats();
-                CHANNEL.sendTo(
-                    new RedeemResultPacket(success, msg),
-                    player.connection.connection,
-                    net.minecraftforge.fml.network.NetworkDirection.PLAY_TO_CLIENT
-                );
+                sendResult(player, success, msg);
                 CHANNEL.sendTo(
                     new PromoStatsPacket(stats.redeemedTotal, stats.maxCapacity, stats.redeemedPlayers),
                     player.connection.connection,
@@ -86,6 +109,30 @@ public class NetworkHandler {
                 );
             });
             ctx.get().setPacketHandled(true);
+        }
+
+        private static void sendResult(ServerPlayerEntity player, boolean ok, String msg) {
+            CHANNEL.sendTo(
+                new RedeemResultPacket(ok, msg),
+                player.connection.connection,
+                net.minecraftforge.fml.network.NetworkDirection.PLAY_TO_CLIENT
+            );
+        }
+
+        private static boolean isValidHmacFormat(String hmac) {
+            return hmac != null && hmac.length() == 64 && hmac.matches("[0-9a-f]+");
+        }
+    }
+
+    static String sha256Hex(String input) {
+        try {
+            byte[] raw = MessageDigest.getInstance("SHA-256")
+                .digest(input.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder();
+            for (byte b : raw) sb.append(String.format("%02x", b));
+            return sb.toString();
+        } catch (Exception e) {
+            return Integer.toHexString(input.hashCode());
         }
     }
 
@@ -132,9 +179,7 @@ public class NetworkHandler {
     }
 
     public static class PromoStatsPacket {
-        public final int redeemedTotal;
-        public final int maxCapacity;
-        public final int redeemedPlayers;
+        public final int redeemedTotal, maxCapacity, redeemedPlayers;
 
         public PromoStatsPacket(int redeemedTotal, int maxCapacity, int redeemedPlayers) {
             this.redeemedTotal   = redeemedTotal;
