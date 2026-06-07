@@ -37,8 +37,8 @@ public class PromoCodeManager {
     private static final Path NO_PATH = Paths.get("");
     private Path dataFile = NO_PATH;
 
-    private static PromoCodeManager INSTANCE;
-    public  static PromoCodeManager get() {
+    private static volatile PromoCodeManager INSTANCE;
+    public static synchronized PromoCodeManager get() {
         if (INSTANCE == null) INSTANCE = new PromoCodeManager();
         return INSTANCE;
     }
