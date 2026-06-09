@@ -19,7 +19,7 @@ public class PromoCommand {
         (context, builder) -> ISuggestionProvider.suggestResource(ForgeRegistries.ITEMS.getKeys(), builder);
 
     public static void register(CommandDispatcher<CommandSource> dispatcher) {
-        dispatcher.register(Commands.literal("promo")
+        dispatcher.register(Commands.literal("promocode")
             .executes(ctx -> openGui(ctx.getSource()))
             .then(Commands.literal("create")
                 .requires(src -> src.hasPermission(2))
@@ -47,33 +47,6 @@ public class PromoCommand {
             .then(Commands.literal("help")
                 .executes(ctx -> showHelp(ctx.getSource())))
         );
-
-        dispatcher.register(Commands.literal("promocode")
-            .executes(ctx -> openGui(ctx.getSource()))
-            .then(Commands.literal("create")
-                .requires(src -> src.hasPermission(2))
-                .then(Commands.argument("code", StringArgumentType.word())
-                    .then(Commands.argument("args", StringArgumentType.greedyString())
-                        .suggests(ITEM_SUGGESTIONS)
-                        .executes(ctx -> createFromArgs(
-                            ctx.getSource(),
-                            StringArgumentType.getString(ctx, "code"),
-                            StringArgumentType.getString(ctx, "args")
-                        )))))
-            .then(Commands.literal("createraw")
-                .requires(src -> src.hasPermission(2))
-                .then(Commands.argument("definition", StringArgumentType.greedyString())
-                    .executes(ctx -> createCode(ctx.getSource(), StringArgumentType.getString(ctx, "definition")))))
-            .then(Commands.literal("delete")
-                .requires(src -> src.hasPermission(2))
-                .then(Commands.argument("code", StringArgumentType.word())
-                    .executes(ctx -> deleteCode(ctx.getSource(), StringArgumentType.getString(ctx, "code")))))
-            .then(Commands.literal("deleteall")
-                .requires(src -> src.hasPermission(2))
-                .executes(ctx -> deleteAllCodes(ctx.getSource())))
-            .then(Commands.literal("list")
-                .executes(ctx -> listCodes(ctx.getSource())))
-        );
     }
 
 
@@ -90,7 +63,7 @@ public class PromoCommand {
             if (tokens[i].matches("\\d+")) break;
             if (i + 1 >= tokens.length) {
                 source.sendFailure(new StringTextComponent(
-                    "Missing count for item: " + tokens[i] + ". Use /promo help"));
+                    "Missing count for item: " + tokens[i] + ". Use /promocode help"));
                 return 0;
             }
             int count;
@@ -112,7 +85,7 @@ public class PromoCommand {
         }
 
         if (items.isEmpty()) {
-            source.sendFailure(new StringTextComponent("No items provided. Use /promo help"));
+            source.sendFailure(new StringTextComponent("No items provided. Use /promocode help"));
             return 0;
         }
 
@@ -135,7 +108,7 @@ public class PromoCommand {
 
  
         if (i < tokens.length) {
-            source.sendFailure(new StringTextComponent("Too many arguments. Use /promo help"));
+            source.sendFailure(new StringTextComponent("Too many arguments. Use /promocode help"));
             return 0;
         }
 
