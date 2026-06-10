@@ -2,7 +2,6 @@ package com.promocodemod;
 
 import com.promocodemod.common.config.PromoCodeConfig;
 import com.promocodemod.common.network.NetworkHandler;
-import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
@@ -25,8 +24,6 @@ public class PromoCodeMod {
         modEventBus.addListener(this::clientSetup);
 
         ModLoadingContext.get().registerConfig(ModConfig.Type.SERVER, PromoCodeConfig.SERVER_SPEC);
-
-        MinecraftForge.EVENT_BUS.register(this);
     }
 
     private void setup(final FMLCommonSetupEvent event) {
