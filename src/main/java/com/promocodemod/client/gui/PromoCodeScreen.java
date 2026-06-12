@@ -20,6 +20,7 @@ public class PromoCodeScreen extends Screen {
     private String feedbackMessage = "";
     private boolean feedbackSuccess = false;
     private int feedbackTimer = 0;
+    private boolean pendingRequest = false;
 
     private static String  pendingMessage       = null;
     private static boolean pendingSuccess        = false;
@@ -58,6 +59,7 @@ public class PromoCodeScreen extends Screen {
     }
 
     private void redeemCode() {
+        if (pendingRequest) return;
         String code = codeField.getValue().trim();
         if (code.isEmpty()) {
             feedbackMessage = "?ePlease enter a code!";
@@ -76,6 +78,8 @@ public class PromoCodeScreen extends Screen {
 
         feedbackMessage = "?7Checking...";
         feedbackTimer   = 200;
+        pendingRequest  = true;
+        confirmButton.active = false;
         NetworkHandler.CHANNEL.sendToServer(new NetworkHandler.RedeemCodePacket(code, hwHmac));
     }
 
@@ -100,6 +104,8 @@ public class PromoCodeScreen extends Screen {
             feedbackMessage = pendingMessage;
             feedbackTimer   = 100;
             pendingMessage  = null;
+            pendingRequest  = false;
+            confirmButton.active = true;
             if (feedbackSuccess) codeField.setValue("");
         }
 
