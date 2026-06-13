@@ -163,4 +163,14 @@ public class PromoCodeScreen extends Screen {
 
     @Override
     public boolean isPauseScreen() { return false; }
+
+    @Override
+    public void onClose() {
+        pendingMessage        = null;
+        pendingSuccess        = false;
+        pendingRedeemedTotal  = 0;
+        pendingMaxCapacity    = 0;
+        pendingRedeemedPlayers = 0;
+        super.onClose();
+    }
 }

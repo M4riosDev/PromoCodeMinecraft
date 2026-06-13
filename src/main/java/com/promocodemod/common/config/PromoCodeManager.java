@@ -108,7 +108,7 @@ public class PromoCodeManager {
     }
 
     private void save() {
-        if (dataFile == NO_PATH) return; // FIX #5
+        if (dataFile == NO_PATH) return;
         try (Writer w = new FileWriter(dataFile.toFile())) {
             Map<String, Object> root = new LinkedHashMap<>();
 
@@ -186,13 +186,14 @@ public class PromoCodeManager {
 
     public synchronized Stats getStats() {
         int total   = redemptionCounts.values().stream().mapToInt(i -> i).sum();
-        int cap     = 0;
+        long cap    = 0L;
         for (String e : getAllCodeEntries()) {
             PromoDefinition d = parseEntry(e);
             if (d != null && d.maxUses > 0) cap += d.maxUses;
         }
+        int capClamped = cap > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) cap;
         int players = (int) redeemedByUUID.values().stream().filter(s -> !s.isEmpty()).count();
-        return new Stats(total, cap, players);
+        return new Stats(total, capClamped, players);
     }
 
     public synchronized AddCodeResult addCode(String raw) {
